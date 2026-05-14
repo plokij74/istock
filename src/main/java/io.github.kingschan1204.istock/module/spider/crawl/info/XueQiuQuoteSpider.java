@@ -4,6 +4,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.mongodb.client.result.UpdateResult;
 import io.github.kingschan1204.istock.common.util.spring.SpringContextUtil;
+import io.github.kingschan1204.istock.common.util.spring.SpringMailSender;
 import io.github.kingschan1204.istock.common.util.stock.StockSpider;
 import io.github.kingschan1204.istock.module.maindata.po.Stock;
 import io.github.kingschan1204.istock.module.maindata.po.StockCodeInfo;
@@ -12,12 +13,9 @@ import io.github.kingschan1204.istock.module.spider.dto.XqQuoteDto;
 import io.github.kingschan1204.istock.module.spider.entity.WebPage;
 import io.github.kingschan1204.istock.module.spider.timerjob.ITimeJobFactory;
 import io.github.kingschan1204.istock.module.spider.timerjob.ITimerJob;
-import io.github.kingschan1204.istock.module.spider.util.MathFormat;
 import io.github.kingschan1204.istock.module.spider.util.TradingDateUtil;
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
-import org.jsoup.select.Elements;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -25,9 +23,6 @@ import org.springframework.data.mongodb.core.query.Update;
 
 import java.util.HashMap;
 import java.util.List;
-import java.util.concurrent.FutureTask;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicInteger;
 
 
@@ -38,8 +33,8 @@ public class XueQiuQuoteSpider extends AbstractHtmlSpider<Stock> {
     private StockCodeInfo currentCodeInfo;
     private AtomicInteger error;
 
-    public XueQiuQuoteSpider(String useAgent,AtomicInteger error) {
-        this.useAgent = useAgent;
+    public XueQiuQuoteSpider(AtomicInteger error) {
+        this.useAgent = SpringContextUtil.getProperties("spider.useagent");
         this.error=error;
     }
 
@@ -101,6 +96,10 @@ public class XueQiuQuoteSpider extends AbstractHtmlSpider<Stock> {
             if(error.addAndGet(1)>10){
                 log.error("错误超过10次，即将关闭dy任务");
                 ITimeJobFactory.getJob(ITimeJobFactory.TIMEJOB.DY).execute(ITimerJob.COMMAND.STOP);
+                //发邮件通知
+                SpringMailSender mailSender = SpringContextUtil.getBean(SpringMailSender.class);
+                String adminMail=SpringContextUtil.getProperties("app.admin.email");
+                mailSender.sendSimpleTextMail(adminMail,"istock爬虫通知","雪球token失效,错误已超10次，线程已关闭，请更新token再重新启动程序！");
             }
             return;
         }
@@ -127,8 +126,7 @@ public class XueQiuQuoteSpider extends AbstractHtmlSpider<Stock> {
         UpdateResult updateResult2 = getMongoTemp().upsert(
                 new Query(Criteria.where("_id").is(currentCodeInfo.getCode())),
                 new Update().set("dyDate", Integer.valueOf(TradingDateUtil.getDateYYYYMMdd())), "stock_code_info");
-        log.info("dy更新，代码{}受影响行数:{}", currentCodeInfo.getCode(), updateResult.getModifiedCount() + updateResult2.getModifiedCount());
-
+        log.info("XueQiu-dy更新，代码{}受影响行数:{} ", currentCodeInfo.getCode(), updateResult.getModifiedCount() + updateResult2.getModifiedCount());
     }
 
 }

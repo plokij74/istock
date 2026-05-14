@@ -4,7 +4,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-
 import java.util.Date;
 
 /**
@@ -35,4 +34,13 @@ public class StockYearReport {
     //资产负债比率
     private Double asset_liability;
     private Date date;
+    /**2019-11-06改版修正*/
+    //扣非净利润(元)
+    private Double kfjlr;
+    //扣非净利润同比增长率
+    private Double kfjlr_percent;
+    //销售净利率
+    private Double xsjlr;
+    //销售毛利率
+    private Double xsmlr;
 }

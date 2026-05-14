@@ -5,8 +5,10 @@ import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.result.UpdateResult;
+import io.github.kingschan1204.istock.common.db.MyMongoTemplate;
 import io.github.kingschan1204.istock.common.util.stock.StockSpider;
 import io.github.kingschan1204.istock.common.util.stock.impl.JisiluSpilder;
+import io.github.kingschan1204.istock.module.maindata.po.CsIndexIndustry;
 import io.github.kingschan1204.istock.module.maindata.po.Stock;
 import io.github.kingschan1204.istock.module.maindata.po.StockDividend;
 import io.github.kingschan1204.istock.module.maindata.po.StockYearReport;
@@ -51,6 +53,8 @@ public class StockService {
     private StockSpider spider;
     @Autowired
     private MongoTemplate template;
+    @Autowired
+    private MyMongoTemplate myMongoTemplate;
     @Autowired
     private JisiluSpilder jisiluSpilder;
 
@@ -109,7 +113,24 @@ public class StockService {
             query.addCriteria(Criteria.where(field).gte(s).lte(d));
         }
         if (null != industry && !industry.isEmpty()) {
-            query.addCriteria(Criteria.where("industry").is(industry));
+            int i_index=industry.lastIndexOf("-");
+            String type_key=industry.replaceAll("\\|\\-+|\\s","");
+            String query_field=null;
+            if(i_index==-1){
+                query_field="lvone";
+            }else if(i_index==2){
+                query_field="lvtwo";
+            }else if(i_index==3){
+                query_field="lvthree";
+            }else {
+                query_field="lvfour";
+            }
+            List<String> code_list=new ArrayList<>();
+            List<CsIndexIndustry> inlist= template.find(Query.query(Criteria.where(query_field).is(type_key)), CsIndexIndustry.class);
+            for (CsIndexIndustry c: inlist) {
+                code_list.add(c.getCode());
+            }
+            query.addCriteria(Criteria.where("_id").in(code_list));
         }
         //记录总数
         Long total = template.count(query, Stock.class);
@@ -117,7 +138,7 @@ public class StockService {
         query.skip((pageindex - 1) * pagesize).limit(pagesize);
         //排序
         Sort.Direction sortd = "asc".equalsIgnoreCase(psort) ? Sort.Direction.ASC : Sort.Direction.DESC;
-        query.with(new Sort(sortd, orderfidld));
+        query.with(Sort.by(sortd, orderfidld));
         //code
         List<Stock> list = template.find(query, Stock.class);
         //原始数据在vo对象里进行格式转换
@@ -144,7 +165,7 @@ public class StockService {
         Query query = new Query();
         query.addCriteria(Criteria.where("code").is(code));
         //排序
-        query.with(new Sort(Sort.Direction.ASC, "title"));
+        query.with(Sort.by(Sort.Direction.ASC, "title"));
         //code
         List<StockDividend> list = template.find(query, StockDividend.class);
         return list;
@@ -161,7 +182,7 @@ public class StockService {
         Query query = new Query();
         query.addCriteria(Criteria.where("code").is(code));
         //排序
-        query.with(new Sort(Sort.Direction.ASC, "year"));
+        query.with(Sort.by(Sort.Direction.ASC, "year"));
         //code
         List<StockYearReport> list = template.find(query, StockYearReport.class);
         return list;
@@ -184,10 +205,10 @@ public class StockService {
 
         JSONObject data = jisiluSpilder.crawHisPbPePriceAndReports(code);
         List<Document> list = new ArrayList<Document>();
-        MongoCollection<Document> hisdata = template.getCollection("stock_his_pe_pb");
+//        MongoCollection<Document> hisdata = template.getCollection("stock_his_pe_pb");
         MongoCollection<Document> report = template.getCollection("stock_report");
 
-        JSONArray hisdataJsons = data.getJSONArray("hisdata");
+       /* JSONArray hisdataJsons = data.getJSONArray("hisdata");
         for (int i = 0; i < hisdataJsons.size(); i++) {
             JSONObject row = hisdataJsons.getJSONObject(i);
             Document object = new Document();
@@ -213,7 +234,7 @@ public class StockService {
                 hisdata.insertMany(list);
                 list.clear();
             }
-        }
+        }*/
 
 
         JSONArray reportJsons = data.getJSONArray("reports");

@@ -1,10 +1,12 @@
 package io.github.kingschan1204.istock;
 
 import io.github.kingschan1204.istock.common.startup.InitQuartzTaskRunner;
+import io.github.kingschan1204.istock.common.util.cache.EhcacheUtil;
 import io.github.kingschan1204.istock.module.maindata.services.StockService;
 import io.github.kingschan1204.istock.module.spider.timerjob.ITimeJobFactory;
 import io.github.kingschan1204.istock.module.spider.timerjob.ITimerJob;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.Banner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.web.servlet.ServletComponentScan;
@@ -28,12 +30,12 @@ import java.util.List;
 public class Application {
 
     @Autowired
-    private StockService stockService;
+    private EhcacheUtil ehcacheUtil;
 
     @RequestMapping("/")
     public String index(Model model) {
-        List<String> list = stockService.getAllIntruduce();
-        model.addAttribute("industry", list);
+        model.addAttribute("industry", ehcacheUtil.getKey("App_init","ths_type"));
+        model.addAttribute("zzfl", ehcacheUtil.getKey("App_init","zzfl"));
         return "index";
     }
 
@@ -42,8 +44,11 @@ public class Application {
         return new InitQuartzTaskRunner();
     }
 
+
     public static void main(String[] args) {
-        SpringApplication.run(Application.class, args);
+        SpringApplication app = new SpringApplication(Application.class);
+        app.setBannerMode(Banner.Mode.OFF);
+        app.run(args);
         try {
             ITimeJobFactory.getJob(ITimeJobFactory.TIMEJOB.CORE_SCHEDULE).execute(ITimerJob.COMMAND.START);
         } catch (Exception e) {
